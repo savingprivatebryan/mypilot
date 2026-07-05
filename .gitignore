@@ -33,6 +33,9 @@ mypilot-agent/.mypilot/
 # The public recipe must produce a clean, publishable image; any private layer is applied locally on
 # top and lives only here, untracked.
 mypilot-mici/bases/*/private/
+# The private layer's assembled-tree home (its verifier + a build-specific denylist companion).
+# Populated only on a private build; must never be tracked in the public tree.
+sunnypilot/mypilot/private/
 
 # --- Per-deployment private compose override + private settings overlay — NEVER commit ---
 # Wires this deployment's private settings JSON (e.g. owner-only safety toggles) into the api

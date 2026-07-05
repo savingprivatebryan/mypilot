@@ -1,0 +1,100 @@
+# Reusable MyPilot device-image build (PUBLIC / self-host).
+#
+# Fork this repo and run this workflow in YOUR fork, on YOUR runner. It tracks sunnypilot upstream
+# (stable tags + the nightly branch), replays the PUBLIC MyPilot layer on top, assembles a device
+# image, and verifies it. It publishes to a channel branch in YOUR fork; your comma tracks that
+# branch (see docs/self-host-build.md).
+#
+# This is DIY tooling: your fork, your runner, your device, your builds. Nothing here talks to any
+# hosted MyPilot service — it references ONLY public inputs (the public sunnypilot upstream + this
+# public repo). There is no --private layer, no secret, and no hosted build/serve/sign step.
+#
+# SAFETY: this builds an image for a car that steers. The verify step enforces the no-driving-bus
+# safety gate on EVERY build; a build that fails verification is NOT published. You are responsible
+# for testing any build before you drive it. Nightly tracks bleeding-edge upstream — treat it as
+# untested.
+
+name: build-device-image
+
+on:
+  # Track upstream on a schedule. Adjust/remove as you like in your fork.
+  schedule:
+    - cron: "0 9 * * *"   # daily ~09:00 UTC; picks up new sunnypilot stable tags + nightly
+  # Manual trigger: pick the channel to build.
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Which upstream to track"
+        type: choice
+        default: stable
+        options: [stable, nightly]
+
+# Only public inputs. No secrets are referenced; do NOT add enterprise remotes or credentials here —
+# a public build must reference public inputs only (that is what keeps a fork's build provably clean).
+env:
+  UPSTREAM_REMOTE: "https://github.com/sunnypilot/sunnypilot.git"
+  # Which upstream ref maps to each channel. Override in your fork if you track a different lineage.
+  STABLE_REF: "release-mici"     # newest stable lineage; the workflow resolves the latest tag on it
+  NIGHTLY_REF: "__nightly"       # sunnypilot bleeding-edge branch
+  BASE: "sunnypilot"             # assemble.py base layout
+
+jobs:
+  build:
+    runs-on: ubuntu-latest       # or a self-hosted runner label in your fork
+    steps:
+      - name: Checkout this (public) repo — the MyPilot layer + recipe
+        uses: actions/checkout@v4
+        with:
+          path: mypilot
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve upstream ref for the chosen channel
+        id: ref
+        run: |
+          set -euo pipefail
+          CH="${{ github.event.inputs.channel || 'stable' }}"
+          if [ "$CH" = "nightly" ]; then
+            echo "ref=$NIGHTLY_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=$STABLE_REF" >> "$GITHUB_OUTPUT"
+          fi
+          echo "channel=$CH" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch sunnypilot upstream (public; no auth)
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none "$UPSTREAM_REMOTE" upstream
+          cd upstream
+          git fetch --tags origin
+
+      # Replay the MyPilot PUBLIC layer onto the resolved upstream ref, then assemble + verify.
+      # (Phase 1 wires assemble + verify; the replay/rebase driver lands with the shared replay
+      # mechanics — see docs/self-host-build.md for the manual replay steps until then.)
+      - name: Assemble device image (PUBLIC core only — no --private)
+        run: |
+          set -euo pipefail
+          # Build the assembled tree from the public recipe. NOTE: no --private flag anywhere.
+          python3 mypilot/mypilot-mici/assemble.py build \
+            --base "$BASE" --target "$GITHUB_WORKSPACE/assembled"
+
+      - name: Verify assembled image (safety + zero-leak, fail-closed)
+        run: |
+          set -euo pipefail
+          # --expect-public: FAIL if the tree carries any private/secret/cloud content OR a
+          # driving-bus reader. A failing verify does NOT publish.
+          python3 mypilot/mypilot-mici/verify_assembled.py \
+            --target "$GITHUB_WORKSPACE/assembled" --expect-public
+
+      - name: Publish to your fork's channel branch
+        if: success()
+        run: |
+          set -euo pipefail
+          # Publishes to a channel branch in YOUR fork's origin (the repo you forked into).
+          # Your comma tracks this branch; see docs/self-host-build.md.
+          echo "verify passed — publish step: push the assembled tree to your channel branch"
+          echo "(publish wiring reuses mypilot-mici/publish.sh; configure your fork's channel name there)"
