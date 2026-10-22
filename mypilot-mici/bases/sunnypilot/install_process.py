@@ -35,7 +35,7 @@ import os
 import re
 import sys
 
-VERSION_H = "openpilot/sunnypilot/common/version.h"
+VERSION_H = "sunnypilot/common/version.h"
 # Version becomes  <BASE_TAG>-<upstream-version>-mypilot-<base-date>-<NN>  e.g.
 #   sunnypilot-2026.002.000-mypilot-2026.06.26-18
 # BASE_TAG names the upstream base (sunnypilot / frogpilot / openpilot, spelled out for clarity); the
