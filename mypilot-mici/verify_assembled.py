@@ -206,10 +206,13 @@ def main() -> int:
         check(not os.path.exists("selfdrive/ui/sunnypilot/mici/layouts/sunnylink.py"),
               "dead sunnylink.py panel still present")
         # 4b. Version stamped with the sunnypilot- base tag (fails loud if upstream moved version.h).
-        vh = "sunnypilot/common/version.h"
-        if os.path.exists(vh):
+        candidates = ("openpilot/sunnypilot/common/version.h", "sunnypilot/common/version.h")
+        vh = next((p for p in candidates if os.path.exists(p)), None)
+        if vh is not None:
             check('SUNNYPILOT_VERSION "sunnypilot-' in open(vh).read(),
                   "version not stamped with sunnypilot- base tag")
+        else:
+            check(False, "version header not found in expected locations")
 
     # 5. Agent overlay present + import-safe launcher.
     launcher = next((p for p in ("sunnypilot/mypilot/mypilotd.py", "mypilot/mypilotd.py")
