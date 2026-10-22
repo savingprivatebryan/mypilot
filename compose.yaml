@@ -29,7 +29,7 @@ services:
       - mypilot_redis:/data
 
   mypilot-object-storage:
-    image: quay.io/minio/minio
+    image: rustfs/rustfs:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
