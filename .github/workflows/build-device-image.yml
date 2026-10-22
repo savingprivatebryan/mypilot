@@ -68,7 +68,7 @@ jobs:
       - name: Fetch sunnypilot upstream (public; no auth)
         run: |
           set -euo pipefail
-          git clone --filter=blob:none "$UPSTREAM_REMOTE" upstream
+          git clone --filter=blob:none "$UPSTREAM_REMOTE" "$GITHUB_WORKSPACE/upstream"
           cd upstream
           git fetch --tags origin
 
